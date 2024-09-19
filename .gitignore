@@ -1,0 +1,24 @@
+*.swp
+package-lock.json
+__pycache__
+.pytest_cache
+.venv
+*.egg-info
+# Ignore all package directories recursively
+**/packages/
+packages/
+packages/*
+./packages
+./tests/unit/packages/urllib3/
+./tests/integration/packages/*
+packages
+**/urllib3/
+urllib3/
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+# Specific directories for urllib3 or similar nested directories
+**/urllib3/
+urllib3/
+tests/**/urllib3/
+*/urllib3/
