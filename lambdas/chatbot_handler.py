@@ -37,7 +37,7 @@ class ChatBotHandler(BaseLambdaHandler):
                 "** ChatBotHandler::on_error() is done. Error on trying reply user:", e
             )
 
-    def handle(self):
+    def _handle(self):
         """
         Handles the lambda function invocation by checking whether a message
         (most likely the last message) in the chat currently being serviced is
