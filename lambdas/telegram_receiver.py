@@ -15,7 +15,7 @@ class TelegramReceiver(BaseLambdaHandler):
     """
     The Lambda handler class to process incoming Telegram messages.
     """
-    def handle(self):
+    def _handle(self):
         """
         The main method to process incoming Telegram messages.
         """
