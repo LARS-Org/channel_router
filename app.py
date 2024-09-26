@@ -2,10 +2,9 @@
 import aws_cdk as cdk
 
 from channel_router.channel_router_stack import ChannelRouterStack
-from lambdas.channels_config import CHANNELS_HANDLER_CLASS_MAP
 
 app = cdk.App()
-ChannelRouterStack(app, "ChannelRouterStack", channels_map=CHANNELS_HANDLER_CLASS_MAP,
+ChannelRouterStack(app, "ChannelRouterStack",
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.

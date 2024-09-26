@@ -24,11 +24,12 @@ class ChannelRouterStack(Stack):
     Uses FIFO SQS queues to ensure message ordering between the receiver and handler Lambdas.
     """
 
-    def __init__(self, scope: Construct, construct_id: str, channels_map: dict, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
         
         # List of supported channels
-        channels_list = list(channels_map.keys())
+        # TODO: #1 get this list from a configuration file or environment variables
+        channels_list = {"telegram", "whatsapp", "messenger"}
 
         # Create API Gateway to handle incoming webhooks from various channels
         api_gateway = apigateway.RestApi(
