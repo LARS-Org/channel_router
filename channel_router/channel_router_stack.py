@@ -4,6 +4,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
     aws_sqs as sqs,
+    aws_sns as sns,
 )
 from aws_cdk.aws_lambda_event_sources import SqsEventSource
 from constructs import Construct
@@ -27,73 +28,126 @@ class ChannelRouterStack(Stack):
             rest_api_name="ChannelRouter Webhook API",
             description="API Gateway to receive webhooks from various channels.",
         )
-
-        # Create channel-specific Lambda functions (receiver and handler) and FIFO SQS queues
-        for channel in CHANNELS_LIST:
-            # Create channel-specific receiver Lambda
-            channel_receiver_lambda = self.__create_lambda(channel, "Receiver")
-
-            # Create channel-specific handler Lambda
-            channel_handler_lambda = self.__create_lambda(channel, "Handler")
-
-            # Create FIFO SQS queue for message passing between the receiver and handler Lambdas
-            queue = self.__create_fifo_queue(channel)
-
-            # Grant the receiver Lambda permission to send messages to the FIFO queue
-            queue.grant_send_messages(channel_receiver_lambda)
-
-            # Add the queue URL to the receiver Lambda environment variables
-            channel_receiver_lambda.add_environment(f"{channel.upper()}_MSGS_QUEUE_URL", queue.queue_url)
-
-            # Grant the handler Lambda permission to consume messages from the FIFO queue
-            queue.grant_consume_messages(channel_handler_lambda)
-
-            # Add the FIFO SQS queue as an event source for the handler Lambda
-            channel_handler_lambda.add_event_source(SqsEventSource(queue))
-
-            # Create an API Gateway endpoint for each channel to send messages to the receiver Lambda
-            self.__create_endpoint(api_gateway, channel, channel_receiver_lambda)
-
-    def __create_lambda(self, channel: str, suffix: str) -> _lambda.Function:
-        """
-        Helper function to create a Lambda function with basic configuration for each channel.
-        A receiver and handler Lambda are created for each channel.
-        """
-        lambda_name = f"ChannelRouterStack-{channel.capitalize()}{suffix}Lambda"
-        return _lambda.Function(
+        
+        # Create a unique Lambda function to receive messages from all channels
+        channel_router_lambda = _lambda.Function(
             self,
-            lambda_name,
+            "ChannelRouterLambda",
             runtime=_lambda.Runtime.PYTHON_3_11,
-            handler=f"{channel}_{suffix}.handler".lower(),
-            code=_lambda.Code.from_asset(f"lambdas"),
+            handler="channel_router.handler",
+            code=_lambda.Code.from_asset("lambdas"),
             timeout=Duration.seconds(60),
-            environment={
-                "CHANNEL_NAME": channel
-            }
         )
-
-    def __create_endpoint(self, api_gateway: apigateway.RestApi,  
-                          channel: str, 
-                          receiver_lambda: _lambda.Function) -> apigateway.Resource:
-        """
-        Helper function to create an API Gateway endpoint for a specific channel.
-        """
-        integration = apigateway.LambdaIntegration(receiver_lambda)
-        resource = api_gateway.root.add_resource(channel)
-        resource.add_method("POST", integration)
-        return resource
-
-    def __create_fifo_queue(self, channel: str) -> sqs.Queue:
-        """
-        Helper function to create a FIFO SQS queue for a specific channel to ensure message order 
-        between the receiver and handler Lambdas.
-        """
-        return sqs.Queue(
+        
+        # Create a FIFO queue to keep all incoming messages from all channels
+        all_channels_queue = sqs.Queue(
             self,
-            f"{channel.capitalize()}MessagesQueueFifo",
-            queue_name=f"{channel}-messages-queue.fifo",  # FIFO queue name must end with .fifo
+            "AllChannelsMessagesQueueFifo",
+            queue_name="all-channels-messages-queue.fifo",
             fifo=True,
-            content_based_deduplication=True,  # Ensures messages with identical content are not duplicated
+            content_based_deduplication=True,
             visibility_timeout=Duration.seconds(300),
             retention_period=Duration.days(14),
         )
+        
+        # Grant the channel router Lambda permission to send messages to the all-channels queue
+        all_channels_queue.grant_send_messages(channel_router_lambda)
+        
+        # Add the all-channels queue URL to the channel router Lambda environment variables
+        channel_router_lambda.add_environment("ALL_CHANNELS_MSGS_QUEUE_URL", all_channels_queue.queue_url)
+        
+        # Config one path for each channel handled by the channel_router_lambda
+        for channel in CHANNELS_LIST:
+            api_gateway.root.add_resource(channel).add_method(
+                "POST", apigateway.LambdaIntegration(channel_router_lambda)
+            )
+            
+        # Create a Lambda function to process messages from the all-channels
+        all_channels_handler_lambda = _lambda.Function(
+            self,
+            "AllChannelsHandlerLambda",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="all_channels_handler.handler",
+            code=_lambda.Code.from_asset("lambdas"),
+            timeout=Duration.seconds(60),
+        )
+        
+        # Grant the all-channels handler Lambda permission to receive messages from the all-channels queue
+        all_channels_queue.grant_consume_messages(all_channels_handler_lambda)
+        
+        # Add a SQS event source to the all-channels handler Lambda
+        all_channels_handler_lambda.add_event_source(SqsEventSource(all_channels_queue))
+        
+        # AllChannelsHandlerLambda, after consume and processing the incoming messages, 
+        # must forward the messages using a SNS topic.
+        # Create a SNS topic to forward messages from all channels to the chatbot handler Lambda
+        all_channels_sns_topic = sns.Topic(
+            self,
+            "AllChannelsMessagesTopic",
+            display_name="All Channels Messages Topic",
+            topic_name="all-channels-messages-topic",
+        )
+        
+        # Grant the all-channels handler Lambda permission to publish messages to the all-channels SNS topic
+        all_channels_sns_topic.grant_publish(all_channels_handler_lambda)
+        
+        # Add the all-channels SNS topic ARN to the all-channels handler Lambda environment variables
+        all_channels_handler_lambda.add_environment("ALL_CHANNELS_SNS_TOPIC_ARN", all_channels_sns_topic.topic_arn)
+        
+        
+        # The outcoming messages coming from a SNS topic and must be processed by another Lambda function called OutcomingMessagesHandlerLambda.
+        # Create a SNS topic to receive outcoming messages from external systems
+        outcoming_messages_sns_topic = sns.Topic(
+            self,
+            "OutcomingMessagesTopic",
+            display_name="Outcoming Messages Topic",
+            topic_name="outcoming-messages-topic",
+        )
+        # Create a Lambda function to process messages coming from the outcoming messages SNS topic
+        outcoming_messages_handler_lambda = _lambda.Function(
+            self,
+            "OutcomingMessagesHandlerLambda",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="outcoming_messages_handler.handler",
+            code=_lambda.Code.from_asset("lambdas"),
+            timeout=Duration.seconds(60),
+        )
+        
+        # Grant the outcoming messages handler Lambda permission to receive messages from the outcoming messages SNS topic
+        outcoming_messages_sns_topic.grant_subscribe(outcoming_messages_handler_lambda)
+        
+        # Add the outcoming messages SNS topic ARN to the outcoming messages handler Lambda environment variables
+        outcoming_messages_handler_lambda.add_environment("OUTCOMING_MESSAGES_SNS_TOPIC_ARN", outcoming_messages_sns_topic.topic_arn)
+        
+        # Create a FIFO queue to keep all outcoming messages after processing by the outcoming messages handler Lambda
+        outcoming_messages_queue = sqs.Queue(
+            self,
+            "OutcomingMessagesQueueFifo",
+            queue_name="outcoming-messages-queue.fifo",
+            fifo=True,
+            content_based_deduplication=True,
+            visibility_timeout=Duration.seconds(300),
+            retention_period=Duration.days(14),
+        )
+        
+        # Grant the outcoming messages handler Lambda permission to send messages to the outcoming messages queue
+        outcoming_messages_queue.grant_send_messages(outcoming_messages_handler_lambda)
+        # Add the outcoming messages queue URL to the outcoming messages handler Lambda environment variables
+        outcoming_messages_handler_lambda.add_environment("OUTCOMING_MESSAGES_QUEUE_URL", outcoming_messages_queue.queue_url)
+        
+        # Create a Lambda function to send outcoming messages to the appropriate channel
+        outcoming_messages_sender_lambda = _lambda.Function(
+            self,
+            "OutcomingMessagesSenderLambda",
+            runtime=_lambda.Runtime.PYTHON_3_11,
+            handler="outcoming_messages_sender.handler",
+            code=_lambda.Code.from_asset("lambdas"),
+            timeout=Duration.seconds(60),
+        )
+        
+        # Grant the outcoming messages sender Lambda permission to receive messages from the outcoming messages queue
+        outcoming_messages_queue.grant_consume_messages(outcoming_messages_sender_lambda)
+        
+        # Add a SQS event source to the outcoming messages sender Lambda
+        outcoming_messages_sender_lambda.add_event_source(SqsEventSource(outcoming_messages_queue))
+        
