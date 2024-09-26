@@ -1,3 +1,9 @@
+"""
+This is stack is responsible for handler the incoming and outcoming messages from all supported channels.
+The incoming messages are received by a unique Lambda function and stored in a FIFO SQS queue.
+The messages are then processed by another Lambda function and forwarded to a SNS topic.
+The outcoming messages are received by another Lambda function from a SNS topic and sent to the appropriate channel.
+"""
 from aws_cdk import (
     Duration,
     Stack,
@@ -6,6 +12,7 @@ from aws_cdk import (
     aws_sqs as sqs,
     aws_sns as sns,
 )
+from aws_cdk import aws_sns_subscriptions as sns_subscriptions
 from aws_cdk.aws_lambda_event_sources import SqsEventSource
 from constructs import Construct
 
@@ -103,38 +110,7 @@ class ChannelRouterStack(Stack):
             display_name="Outcoming Messages Topic",
             topic_name="outcoming-messages-topic",
         )
-        # Create a Lambda function to process messages coming from the outcoming messages SNS topic
-        outcoming_messages_handler_lambda = _lambda.Function(
-            self,
-            "OutcomingMessagesHandlerLambda",
-            runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="outcoming_messages_handler.handler",
-            code=_lambda.Code.from_asset("lambdas"),
-            timeout=Duration.seconds(60),
-        )
-        
-        # Grant the outcoming messages handler Lambda permission to receive messages from the outcoming messages SNS topic
-        outcoming_messages_sns_topic.grant_subscribe(outcoming_messages_handler_lambda)
-        
-        # Add the outcoming messages SNS topic ARN to the outcoming messages handler Lambda environment variables
-        outcoming_messages_handler_lambda.add_environment("OUTCOMING_MESSAGES_SNS_TOPIC_ARN", outcoming_messages_sns_topic.topic_arn)
-        
-        # Create a FIFO queue to keep all outcoming messages after processing by the outcoming messages handler Lambda
-        outcoming_messages_queue = sqs.Queue(
-            self,
-            "OutcomingMessagesQueueFifo",
-            queue_name="outcoming-messages-queue.fifo",
-            fifo=True,
-            content_based_deduplication=True,
-            visibility_timeout=Duration.seconds(300),
-            retention_period=Duration.days(14),
-        )
-        
-        # Grant the outcoming messages handler Lambda permission to send messages to the outcoming messages queue
-        outcoming_messages_queue.grant_send_messages(outcoming_messages_handler_lambda)
-        # Add the outcoming messages queue URL to the outcoming messages handler Lambda environment variables
-        outcoming_messages_handler_lambda.add_environment("OUTCOMING_MESSAGES_QUEUE_URL", outcoming_messages_queue.queue_url)
-        
+
         # Create a Lambda function to send outcoming messages to the appropriate channel
         outcoming_messages_sender_lambda = _lambda.Function(
             self,
@@ -145,9 +121,10 @@ class ChannelRouterStack(Stack):
             timeout=Duration.seconds(60),
         )
         
-        # Grant the outcoming messages sender Lambda permission to receive messages from the outcoming messages queue
-        outcoming_messages_queue.grant_consume_messages(outcoming_messages_sender_lambda)
+        # Grant the outcoming messages sender Lambda permission to receive messages from the outcoming messages SNS topic
+        outcoming_messages_sns_topic.grant_subscribe(outcoming_messages_sender_lambda)
         
-        # Add a SQS event source to the outcoming messages sender Lambda
-        outcoming_messages_sender_lambda.add_event_source(SqsEventSource(outcoming_messages_queue))
-        
+        # Configure the outcoming messages sender Lambda as a listener of the outcoming messages SNS topic
+        outcoming_messages_sns_topic.add_subscription(
+            sns_subscriptions.LambdaSubscription(outcoming_messages_sender_lambda)
+        )
