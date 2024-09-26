@@ -16,17 +16,17 @@ from aws_cdk import aws_sns_subscriptions as sns_subscriptions
 from aws_cdk.aws_lambda_event_sources import SqsEventSource
 from constructs import Construct
 
-# List of channels for which the chatbot will be configured.
-CHANNELS_LIST = ["telegram", "whatsapp", "messenger"]  # Add other channels here
-
 class ChannelRouterStack(Stack):
     """
     AWS CDK stack to deploy the ChannelRouter infrastructure for multi-channel chatbot interactions.
     Uses FIFO SQS queues to ensure message ordering between the receiver and handler Lambdas.
     """
 
-    def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
+    def __init__(self, scope: Construct, construct_id: str, channels_map: dict, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
+        
+        # List of supported channels
+        channels_list = list(channels_map.keys())
 
         # Create API Gateway to handle incoming webhooks from various channels
         api_gateway = apigateway.RestApi(
@@ -64,7 +64,7 @@ class ChannelRouterStack(Stack):
         channel_router_lambda.add_environment("ALL_CHANNELS_MSGS_QUEUE_URL", all_channels_queue.queue_url)
         
         # Config one path for each channel handled by the channel_router_lambda
-        for channel in CHANNELS_LIST:
+        for channel in channels_list:
             api_gateway.root.add_resource(channel).add_method(
                 "POST", apigateway.LambdaIntegration(channel_router_lambda)
             )
