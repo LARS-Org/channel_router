@@ -20,13 +20,13 @@ class ChatBotHandler(BaseLambdaHandler):
     This class is the base class for all chatbot handlers.
     """
 
-    def on_error(self, e):
+    def _on_error(self, e):
         """
         Invokes ``on_error()`` on the base class and follows by sending an
         error message to the chat user.
         """
         # call super method
-        super().on_error(e)
+        super()._on_error(e)
         # answering the user with an error message
         try:
             self._reply_with_error(ERROR_MSG_GENERAL)
@@ -101,10 +101,12 @@ class ChatBotHandler(BaseLambdaHandler):
             }
 
             # Send a POST request to the custom handler webhook
+            print(f"Calling custom handler at {custom_handler_url}")
             response = requests.post(custom_handler_url, json=payload, timeout=10)
             response.raise_for_status()  # Raise an error if the request failed          
             # Handle the response from the webhook
-            answer = response.json()["body"]
+            answer = response.text
+            util.do_log(title="Custom Handler Response", obj=answer)            
             
         self._reply_with_plain_text(answer)
         
