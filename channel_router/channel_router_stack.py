@@ -58,6 +58,8 @@ class ChannelRouterStack(Stack):
         # AllChannelsReceiverLambda, after consume and processing the incoming messages, 
         # must forward the messages using a SNS topic.
         # Create a SNS topic to forward messages from all channels to the chatbot handler Lambda
+        # TODO: Add a dead-letter queue to handle failed messages
+        # TODO: Study the use of FIFO SNS topics to ensure message ordering
         incoming_msgs_sns_topic = sns.Topic(
             self,
             "IncomingMessagesTopic",
