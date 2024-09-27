@@ -5,9 +5,9 @@ class ChannelHandler:
     Base class for channel handlers
     """
     @abstractmethod
-    def send_message(self, message):
+    def reply_with_text_msg(self, , ):
         """
-        Sends a message to the channel
+        Sends a text message to the channel
         """
         raise NotImplementedError("Method send_message() must be implemented in the subclass")
     
