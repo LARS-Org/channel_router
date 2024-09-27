@@ -166,16 +166,6 @@ class ChannelHandler:
         # must be implemented by the subclass
 
     @abstractmethod
-    def extract_channel_id(self):
-        """
-        Returns the ID of the channel that is participating in the chat
-        currently being serviced by this lambda function. The default
-        implementation simply raises an exception, and is meant to be
-        overridden by subclasses.
-        """
-        # must be implemented by the subclass
-
-    @abstractmethod
     def extract_channel_user_id(self):
         """
         Returns the ID of the user that is participating in the chat currently
