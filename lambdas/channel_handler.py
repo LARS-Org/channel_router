@@ -1,16 +1,21 @@
 from abc import ABC, abstractmethod
+import sys
+import os
+
+from app_common.base_lambda_handler import BaseLambdaHandler
+
 
 class ChannelHandler:
     """
     Base class for channel handlers
     """
-    
-    def __init__(self, incoming_user_msg_obj:dict) -> None:
+
+    def __init__(self, lambda_handler: BaseLambdaHandler) -> None:
         """
         The constructor receives the channel message object.
         """
-        self._incoming_user_msg_obj = incoming_user_msg_obj
-            
+        self._lambda_handler = lambda_handler
+
     def send_plain_text_reply(
         self,
         full_reply_plain_text_msg,
@@ -36,13 +41,12 @@ class ChannelHandler:
         for msg_segment in msg_segments:
             self._do_reply_with_plain_text(msg_segment)
 
-
     def send_error_reply(self, error_msg):
         """
         This method replies the user with an error message.
         """
         # TODO: #7 Implements sending email to developers support for errors.
-        # Maybe we can build a exception handling class to do this. 
+        # Maybe we can build a exception handling class to do this.
         # Throwing an exception to be caught by the lambda layer.
         # send a email to the developers, just in case
         # if send_email_to_developers:
@@ -59,7 +63,6 @@ class ChannelHandler:
         self.send_plain_text_reply(
             error_msg,
         )
-
 
     @staticmethod
     def __divide_msg_into_segments(
@@ -148,6 +151,13 @@ class ChannelHandler:
         # must be implemented by the subclass
 
     @abstractmethod
+    def extract_app_id(self):
+        """
+        This method must return the app id.
+        """
+        # must be implemented by the subclass
+
+    @abstractmethod
     def extract_user_txt_msg(self) -> str:
         """
         This method must return the user message, if the message is a user message.
@@ -193,7 +203,7 @@ class ChannelHandler:
     def validate_user_as_human(self) -> bool:
         """
         Check if the user is a human.
-        returns True if the user is a human, 
+        returns True if the user is a human,
         otherwise, returns False (it means the user is a bot).
         """
         # must be implemented by the subclass

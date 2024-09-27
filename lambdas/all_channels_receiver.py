@@ -35,8 +35,9 @@ class AllChannelsReceiver(BaseLambdaHandler):
             return
 
         # Create the handler instance
-        handler_instance: ChannelHandler = handler_class(self.body)
+        handler_instance: ChannelHandler = handler_class(self)
         # Get the message details from the handler
+        app_id = handler_instance.extract_app_id()
         user_message = handler_instance.extract_user_txt_msg()
         channel_user_firstname = handler_instance.extract_channel_user_firstname()
         channel_user_id = handler_instance.extract_channel_user_id()
@@ -47,6 +48,7 @@ class AllChannelsReceiver(BaseLambdaHandler):
         sns_topic_arn = self.get_env_var("INCOMING_MSGS_SNS_TOPIC_ARN")
         sns_message = json.dumps(
             {
+                "app_id": app_id,
                 "channel": channel_name,
                 "user_message": user_message,
                 "channel_user_firstname": channel_user_firstname,
@@ -63,6 +65,8 @@ def handler(event, context):
     """
     Lambda function to process the incoming messages and send to a SNS topic.
     """
+    print(event)
+    print(context)
     _handler = AllChannelsReceiver()
     # Implicitly invokes __call__() ...
     #   ... which invokes _do_the_job() ...

@@ -1,9 +1,11 @@
 """
 This module contains the Lambda handler class to process incoming Telegram messages.
 """
+
 from channel_handler import ChannelHandler
 import os
 import requests
+from app_common.base_lambda_handler import BaseLambdaHandler
 
 
 class TelegramHandler(ChannelHandler):
@@ -11,8 +13,8 @@ class TelegramHandler(ChannelHandler):
     The Lambda handler class to process incoming Telegram messages.
     """
 
-    def __init__(self, incoming_user_msg_obj: dict) -> None:
-        super().__init__(incoming_user_msg_obj)
+    def __init__(self, lambda_handler: BaseLambdaHandler) -> None:
+        super().__init__(lambda_handler)
         # Telegram Bot Token from environment variable
         self._bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
         self._telegram_server_url = f"https://api.telegram.org/bot{self._bot_token}/"
@@ -42,6 +44,13 @@ class TelegramHandler(ChannelHandler):
         """
         return 4096
 
+    def extract_app_id(self):
+        """
+        Extracts the app ID from the Telegram message currently being serviced.
+        For that use the 'X-Telegram-Bot-Api-Secret-Token' header from the incoming message.
+        """
+        return self._lambda_handler.event["headers"]["X-Telegram-Bot-Api-Secret-Token"]
+
     def extract_user_txt_msg(self) -> str:
         """
         Returns the text of a message (most likely the latest message) in the
@@ -50,12 +59,13 @@ class TelegramHandler(ChannelHandler):
         dictionary with data from a Telegram message, see the file
         ``docs/telegram/typical-lambda-function-parameters.txt``.
         """
+        body = self._lambda_handler.body
         if (
-            "message" in self._incoming_user_msg_obj
-            and "text" in self._incoming_user_msg_obj["message"]
-            and self._incoming_user_msg_obj["message"]["text"]
+            "message" in body
+            and "text" in body["message"]
+            and body["message"]["text"]
         ):
-            return self._incoming_user_msg_obj["message"]["text"]
+            return body["message"]["text"]
         # else
         return None
 
@@ -71,7 +81,7 @@ class TelegramHandler(ChannelHandler):
         # if self.get_callback_data():
         #     return self._incoming_user_msg_obj["callback_query"]["from"]["first_name"]
         # else
-        return self._incoming_user_msg_obj["message"]["from"]["first_name"]
+        return self._lambda_handler.body["message"]["from"]["first_name"]
 
     def extract_channel_user_id(self):
         """
@@ -86,7 +96,7 @@ class TelegramHandler(ChannelHandler):
         # if self.get_callback_data() is not None:
         #     return self._incoming_user_msg_obj["callback_query"]["from"]["id"]
         # else
-        return self._incoming_user_msg_obj["message"]["from"]["id"]
+        return self._lambda_handler.body["message"]["from"]["id"]
 
     def extract_channel_chat_id(self):
         """
@@ -100,7 +110,7 @@ class TelegramHandler(ChannelHandler):
         # if self.get_callback_data():
         #     return self._incoming_user_msg_obj["callback_query"]["message"]["chat"]["id"]
         # else
-        return self._incoming_user_msg_obj["message"]["chat"]["id"]
+        return self._lambda_handler.body["message"]["chat"]["id"]
 
     # returns the telegram update_id
     def extract_channel_msg_id(self):
@@ -116,7 +126,7 @@ class TelegramHandler(ChannelHandler):
         # if self.get_callback_data():
         #     return self._incoming_user_msg_obj["callback_query"]["message"]["message_id"]
         # else
-        return self._incoming_user_msg_obj["message"]["message_id"]
+        return self._lambda_handler.body["message"]["message_id"]
 
     def validate_user_as_human(self) -> bool:
         """
@@ -133,4 +143,4 @@ class TelegramHandler(ChannelHandler):
         # if self.get_callback_data():
         #     return self._incoming_user_msg_obj["callback_query"]["from"]["is_bot"]
         # else
-        return self._incoming_user_msg_obj["message"]["from"]["is_bot"]
+        return self._lambda_handler.body["message"]["from"]["is_bot"]
