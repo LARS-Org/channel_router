@@ -1,41 +1,136 @@
+"""
+This module contains the Lambda handler class to process incoming Telegram messages.
+"""
 from channel_handler import ChannelHandler
+import os
+import requests
+
 
 class TelegramHandler(ChannelHandler):
     """
-    Handler class for Telegram channel
+    The Lambda handler class to process incoming Telegram messages.
     """
-    def send_message(self, message):
+
+    def __init__(self, incoming_user_msg_obj: dict) -> None:
+        super().__init__(incoming_user_msg_obj)
+        # Telegram Bot Token from environment variable
+        self._bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        self._telegram_server_url = f"https://api.telegram.org/bot{self._bot_token}/"
+
+    def _do_reply_with_plain_text(self, full_msg):
         """
-        Sends a message to the Telegram channel
+        Leverages the Telegram API to send a text-only message to the Telegram
+        chat currently being serviced by this lambda function, and returns the
+        response provided by Telegram after converting it to JSON format.
         """
-        pass
-    
-    def extract_message(self, event):
+        data = {
+            "chat_id": self.extract_channel_chat_id(),
+            "text": full_msg,
+            "parse_mode": "HTML",
+        }
+        response = requests.post(
+            self._telegram_server_url + "sendMessage", data=data, timeout=10
+        )
+
+        response_json = response.json()
+
+        return response_json
+
+    def _get_max_message_length(self) -> int:
         """
-        Extracts the message from the event
+        Returns the maximum message length supported by Telegram.
         """
-        pass
-    
-    def extract_sender(self, event):
+        return 4096
+
+    def extract_user_txt_msg(self) -> str:
         """
-        Extracts the sender from the event
+        Returns the text of a message (most likely the latest message) in the
+        Telegram chat currently being serviced by this lambda function. The
+        message text comes from the ``body`` attribute. For an example of a
+        dictionary with data from a Telegram message, see the file
+        ``docs/telegram/typical-lambda-function-parameters.txt``.
         """
-        pass
-    
-    def extract_timestamp(self, event):
+        if (
+            "message" in self._incoming_user_msg_obj
+            and "text" in self._incoming_user_msg_obj["message"]
+            and self._incoming_user_msg_obj["message"]["text"]
+        ):
+            return self._incoming_user_msg_obj["message"]["text"]
+        # else
+        return None
+
+    def extract_channel_user_firstname(self):
         """
-        Extracts the timestamp from the event
+        Returns the first name of the user that is participating in the
+        Telegram chat currently being serviced by this lambda function. The
+        first name can come either from the ``callback_query`` dictionary or
+        the ``message`` dictionary of the ``body`` attribute. For an example of
+        a dictionary with data from a Telegram message, see the file
+        ``docs/telegram/typical-lambda-function-parameters.txt``.
         """
-        pass
-    
-    def extract_chat_id(self, event):
+        # if self.get_callback_data():
+        #     return self._incoming_user_msg_obj["callback_query"]["from"]["first_name"]
+        # else
+        return self._incoming_user_msg_obj["message"]["from"]["first_name"]
+
+    def extract_channel_user_id(self):
         """
-        Extracts the chat_id from the event
+        Returns the ID of the user that is participating in the Telegram chat
+        currently being serviced by this lambda function. The user ID can come
+        either from the ``callback_query`` dictionary or the ``message``
+        dictionary of the ``body`` attribute. For an example of a dictionary
+        with data from a Telegram message, see the file
+        ``docs/telegram/typical-lambda-function-parameters.txt``.
         """
-        pass
-    
-    def extract_message_id(self, event):
+
+        # if self.get_callback_data() is not None:
+        #     return self._incoming_user_msg_obj["callback_query"]["from"]["id"]
+        # else
+        return self._incoming_user_msg_obj["message"]["from"]["id"]
+
+    def extract_channel_chat_id(self):
         """
-        Extracts the message_id from the event
+        Returns the ID of the Telegram chat currently being serviced by this
+        lambda function. The chat ID can come either from the ``callback_query``
+        dictionary or the ``message`` dictionary of the ``body`` attribute. For
+        an example of a dictionary with data from a Telegram message, see the
+        file ``docs/telegram/typical-lambda-function-parameters.txt``.
         """
-        pass
+
+        # if self.get_callback_data():
+        #     return self._incoming_user_msg_obj["callback_query"]["message"]["chat"]["id"]
+        # else
+        return self._incoming_user_msg_obj["message"]["chat"]["id"]
+
+    # returns the telegram update_id
+    def extract_channel_msg_id(self):
+        """
+        Returns the ID of a message (most likely the latest message) in the
+        Telegram chat currently being serviced by this lambda function. The
+        message ID can come either from the ``callback_query`` dictionary or
+        the ``message`` dictionary of the ``body`` attribute. For an example of
+        a dictionary with data from a Telegram message, see the file
+        ``docs/telegram/typical-lambda-function-parameters.txt``.
+        """
+
+        # if self.get_callback_data():
+        #     return self._incoming_user_msg_obj["callback_query"]["message"]["message_id"]
+        # else
+        return self._incoming_user_msg_obj["message"]["message_id"]
+
+    def validate_user_as_human(self) -> bool:
+        """
+        Returns ``True`` in case the user that sent a message (most likely the
+        latest message) in the Telegram chat currently being serviced by this
+        lambda function is a bot, and ``False`` otherwise.
+
+        ATTENTION: Telegram bots cannot send messages to other bots -- if our
+        bot ever receives a message from another Telegram bot, something must
+        be quite wrong! Also, when a user clicks on an inline button in a
+        Telegram chat, the destination bot receives a callback query.
+        """
+
+        # if self.get_callback_data():
+        #     return self._incoming_user_msg_obj["callback_query"]["from"]["is_bot"]
+        # else
+        return self._incoming_user_msg_obj["message"]["from"]["is_bot"]

@@ -12,7 +12,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), "packages"))
 
 from app_common.base_lambda_handler import BaseLambdaHandler
 from channels_config import CHANNELS_HANDLER_CLASS_MAP as HANDLERS_MAP
-
+from channel_handler import ChannelHandler
 
 class AllChannelsReceiver(BaseLambdaHandler):
     """
@@ -25,13 +25,33 @@ class AllChannelsReceiver(BaseLambdaHandler):
         """
         # The resource corresponds to the channel name that sent the message
         channel_name = self.event["resource"].split("/")[-1]
-        # TODO: #3 Refactor to use a common do_log method from the BaseLambdaHandler
         self.do_log(f"Received message from channel: {channel_name}")
-
+        
+        # Get the handler class for the channel
+        handler_class = HANDLERS_MAP.get(channel_name)
+        if not handler_class:
+            self.do_log(f"Channel {channel_name} not supported.")
+            return
+        
+        # Create the handler instance
+        handler_instance:ChannelHandler = handler_class(self.body)
+        # Get the message details from the handler
+        user_message = handler_instance.extract_user_txt_msg()
+        channel_user_firstname = handler_instance.extract_channel_user_firstname()
+        channel_user_id = handler_instance.extract_channel_user_id()
+        channel_chat_id = handler_instance.extract_channel_chat_id()
+        channel_msg_id = handler_instance.extract_channel_msg_id()
+        
+                
         # Get the SNS topic ARN from the environment variable
-        sns_topic_arn = os.environ.get("INCOMING_MSGS_SNS_TOPIC_ARN")
+        sns_topic_arn = self.get_env_var("INCOMING_MSGS_SNS_TOPIC_ARN")
         sns_message = json.dumps(
-            {"channel": channel_name, "incoming_message": self.body}
+            {"channel": channel_name, 
+             "user_message": user_message,
+             "channel_user_firstname": channel_user_firstname,
+             "channel_user_id": channel_user_id,
+             "channel_chat_id": channel_chat_id,
+             "channel_msg_id": channel_msg_id}
         )
         # Forward the message to the SNS topic
         self.publish_to_sns(topic_arn=sns_topic_arn, message=sns_message)
