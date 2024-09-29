@@ -151,7 +151,7 @@ class ChannelHandler:
         # must be implemented by the subclass
 
     @abstractmethod
-    def extract_app_id(self):
+    def extract_app_token(self):
         """
         This method must return the app id.
         """
