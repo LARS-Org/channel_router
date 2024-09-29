@@ -1,22 +1,23 @@
 """
-This stack is responsible for handler the incoming and outcoming messages 
+This stack is responsible for handling the incoming and outgoing messages 
 from all supported channels.
 The incoming messages are received by a unique Lambda function and forwarded to 
-a SNS topic after the channel identification.
-The outcoming messages are received by another Lambda function from a SNS topic and sent to 
+an SNS topic after the channel identification.
+The outgoing messages are received by another Lambda function from an SNS topic and sent to 
 the appropriate channel.
 """
+
 from aws_cdk import (
     Duration,
     Stack,
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
-    aws_sqs as sqs,
     aws_sns as sns,
+    CfnOutput,  # *** Add CfnOutput to export resources ***
 )
 from aws_cdk import aws_sns_subscriptions as sns_subscriptions
-from aws_cdk.aws_lambda_event_sources import SqsEventSource
 from constructs import Construct
+
 
 class ChannelRouterStack(Stack):
     """
@@ -26,7 +27,7 @@ class ChannelRouterStack(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
-        
+
         # List of supported channels
         # TODO: #1 get this list from a configuration file or environment variables
         channels_list = {"telegram", "whatsapp", "messenger"}
@@ -38,7 +39,7 @@ class ChannelRouterStack(Stack):
             rest_api_name="ChannelRouter Webhook API",
             description="API Gateway to receive webhooks from various channels.",
         )
-        
+
         # Create a unique Lambda function to receive messages from all channels
         all_channels_receiver_lambda = _lambda.Function(
             self,
@@ -48,54 +49,63 @@ class ChannelRouterStack(Stack):
             code=_lambda.Code.from_asset("lambdas"),
             timeout=Duration.seconds(60),
         )
-        
+
         # Config one path for each channel handled by the all_channels_receiver_lambda
         for channel in channels_list:
             api_gateway.root.add_resource(channel).add_method(
                 "POST", apigateway.LambdaIntegration(all_channels_receiver_lambda)
             )
-            
-        # AllChannelsReceiverLambda, after consume and processing the incoming messages, 
-        # must forward the messages using a SNS topic.
-        # Create a SNS topic to forward messages from all channels to the chatbot handler Lambda
-        # TODO: #6 Add a dead-letter queue to handle failed messages
-        # TODO: #5 Study the use of FIFO SNS topics to ensure message ordering
+
+        # AllChannelsReceiverLambda, after consuming and processing the incoming messages,
+        # must forward the messages using an SNS topic.
+        # Create an SNS topic to forward messages from all channels to the chatbot handler Lambda
         incoming_msgs_sns_topic = sns.Topic(
             self,
             "IncomingMessagesTopic",
             display_name="Incoming Messages Topic",
             topic_name="incoming-messages-topic",
         )
-        
+
         # Grant the all-channels handler Lambda permission to publish messages to the all-channels SNS topic
         incoming_msgs_sns_topic.grant_publish(all_channels_receiver_lambda)
-        
+
         # Add the all-channels SNS topic ARN to the all-channels handler Lambda environment variables
-        all_channels_receiver_lambda.add_environment("INCOMING_MSGS_SNS_TOPIC_ARN", incoming_msgs_sns_topic.topic_arn)
-                
-        # The outcoming messages coming from a SNS topic and must be processed by another Lambda function called OutcomingMessagesHandlerLambda.
-        # Create a SNS topic to receive outcoming messages from external systems
-        outcoming_messages_sns_topic = sns.Topic(
-            self,
-            "OutcomingMessagesTopic",
-            display_name="Outcoming Messages Topic",
-            topic_name="outcoming-messages-topic",
+        all_channels_receiver_lambda.add_environment(
+            "INCOMING_MSGS_SNS_TOPIC_ARN", incoming_msgs_sns_topic.topic_arn
         )
 
-        # Create a Lambda function to send outcoming messages to the appropriate channel
-        outcoming_messages_sender_lambda = _lambda.Function(
+        # *** Export the SNS Topic ARN using CfnOutput for cross-stack reference ***
+        CfnOutput(
             self,
-            "OutcomingMessagesSenderLambda",
+            "IncomingMessagesTopicArn",
+            value=incoming_msgs_sns_topic.topic_arn,
+            export_name="IncomingMessagesTopicArn",  # Export name to be referenced by other stacks
+        )
+        # This makes the SNS topic's ARN accessible to other stacks (like ChatBotAppManager)
+
+        # The outgoing messages coming from an SNS topic must be processed by another Lambda function called OutcomingMessagesHandlerLambda.
+        # Create an SNS topic to receive outgoing messages from external systems
+        outgoing_messages_sns_topic = sns.Topic(
+            self,
+            "OutgoingMessagesTopic",
+            display_name="Outgoing Messages Topic",
+            topic_name="outgoing-messages-topic",
+        )
+
+        # Create a Lambda function to send outgoing messages to the appropriate channel
+        outgoing_messages_sender_lambda = _lambda.Function(
+            self,
+            "OutgoingMessagesSenderLambda",
             runtime=_lambda.Runtime.PYTHON_3_11,
-            handler="outcoming_messages_sender.handler",
+            handler="outgoing_messages_sender.handler",
             code=_lambda.Code.from_asset("lambdas"),
             timeout=Duration.seconds(60),
         )
-        
-        # Grant the outcoming messages sender Lambda permission to receive messages from the outcoming messages SNS topic
-        outcoming_messages_sns_topic.grant_subscribe(outcoming_messages_sender_lambda)
-        
-        # Configure the outcoming messages sender Lambda as a listener of the outcoming messages SNS topic
-        outcoming_messages_sns_topic.add_subscription(
-            sns_subscriptions.LambdaSubscription(outcoming_messages_sender_lambda)
+
+        # Grant the outgoing messages sender Lambda permission to receive messages from the outgoing messages SNS topic
+        outgoing_messages_sns_topic.grant_subscribe(outgoing_messages_sender_lambda)
+
+        # Configure the outgoing messages sender Lambda as a listener of the outgoing messages SNS topic
+        outgoing_messages_sns_topic.add_subscription(
+            sns_subscriptions.LambdaSubscription(outgoing_messages_sender_lambda)
         )
