@@ -43,6 +43,7 @@ class AllChannelsReceiver(BaseLambdaHandler):
         channel_user_id = handler_instance.extract_channel_user_id()
         channel_chat_id = handler_instance.extract_channel_chat_id()
         channel_msg_id = handler_instance.extract_channel_msg_id()
+        user_message_timestamp = handler_instance.extract_message_timestamp()
 
         # Get the SNS topic ARN from the environment variable
         sns_topic_arn = self.get_env_var("INCOMING_MSGS_SNS_TOPIC_ARN")
@@ -55,6 +56,7 @@ class AllChannelsReceiver(BaseLambdaHandler):
                 "channel_user_id": channel_user_id,
                 "channel_chat_id": channel_chat_id,
                 "channel_msg_id": channel_msg_id,
+                "user_message_timestamp": user_message_timestamp,
             }
         )
         # Forward the message to the SNS topic

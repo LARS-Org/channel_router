@@ -60,11 +60,7 @@ class TelegramHandler(ChannelHandler):
         ``docs/telegram/typical-lambda-function-parameters.txt``.
         """
         body = self._lambda_handler.body
-        if (
-            "message" in body
-            and "text" in body["message"]
-            and body["message"]["text"]
-        ):
+        if "message" in body and "text" in body["message"] and body["message"]["text"]:
             return body["message"]["text"]
         # else
         return None
@@ -144,3 +140,9 @@ class TelegramHandler(ChannelHandler):
         #     return self._incoming_user_msg_obj["callback_query"]["from"]["is_bot"]
         # else
         return self._lambda_handler.body["message"]["from"]["is_bot"]
+
+    def extract_message_timestamp(self) -> int:
+        """
+        Extracts the timestamp of the Telegram message.
+        """
+        return self._lambda_handler.body["message"]["date"]

@@ -13,7 +13,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
     aws_sns as sns,
-    CfnOutput,  # *** Add CfnOutput to export resources ***
+    CfnOutput,  
 )
 from aws_cdk import aws_sns_subscriptions as sns_subscriptions
 from constructs import Construct

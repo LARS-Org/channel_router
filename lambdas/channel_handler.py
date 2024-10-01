@@ -1,6 +1,4 @@
-from abc import ABC, abstractmethod
-import sys
-import os
+from abc import abstractmethod
 
 from app_common.base_lambda_handler import BaseLambdaHandler
 
@@ -205,5 +203,12 @@ class ChannelHandler:
         Check if the user is a human.
         returns True if the user is a human,
         otherwise, returns False (it means the user is a bot).
+        """
+        # must be implemented by the subclass
+        
+    @abstractmethod
+    def extract_message_timestamp(self) -> int:
+        """
+        This method must return the timestamp of the message.
         """
         # must be implemented by the subclass
