@@ -33,6 +33,8 @@ class TelegramHandler(ChannelHandler):
         response = requests.post(
             self._telegram_server_url + "sendMessage", data=data, timeout=10
         )
+        
+        response.raise_for_status()
 
         response_json = response.json()
 
@@ -106,6 +108,11 @@ class TelegramHandler(ChannelHandler):
         # if self.get_callback_data():
         #     return self._incoming_user_msg_obj["callback_query"]["message"]["chat"]["id"]
         # else
+        if "channel_chat_id" in self._lambda_handler.body:
+            # This is the structure of the body when the
+            # chatbot message arrives after the processing
+            return self._lambda_handler.body["channel_chat_id"]
+        # else:
         return self._lambda_handler.body["message"]["chat"]["id"]
 
     # returns the telegram update_id

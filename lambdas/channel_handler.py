@@ -21,7 +21,8 @@ class ChannelHandler:
         """
         This method must send the message to the chatbot.
         """
-
+        print("full_reply_plain_text_msg: ", full_reply_plain_text_msg)
+        
         if not full_reply_plain_text_msg:
             # nothing to do
             return

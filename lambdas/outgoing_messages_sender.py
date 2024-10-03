@@ -1,6 +1,7 @@
 """
 This module is the Lambda handler to process outgoing messages.
 """
+
 import os
 import sys
 import json
@@ -14,10 +15,12 @@ from app_common.app_utils import do_log
 from channels_config import CHANNELS_HANDLER_CLASS_MAP as HANDLERS_MAP
 from channel_handler import ChannelHandler
 
+
 class MessageSender(BaseLambdaHandler):
     """
     The Lambda handler class to process incoming messages.
     """
+
     def _handle(self):
         """
         The main method to process outcoming messages.
@@ -25,12 +28,13 @@ class MessageSender(BaseLambdaHandler):
         # Getting the channel name from the body
         channel_name = self.body["channel"]
         # Getting the handler class instance for the channel
-        channel_handler:ChannelHandler = HANDLERS_MAP.get(channel_name)
+        channel_handler: ChannelHandler = HANDLERS_MAP.get(channel_name)(self)
         # send the message
-        channel_handler.send_message(self.body["response"])
+        channel_server_response = channel_handler.send_plain_text_reply(
+            self.body["bot_message"]
+        )
+        self.do_log(channel_server_response)
 
-        
-        
 
 def handler(event, context):
     """
@@ -40,15 +44,8 @@ def handler(event, context):
     # Implicitly invokes __call__() ...
     #   ... which invokes _do_the_job() ...
     #     ... which invokes before_handle(), handle() and after_handle()
-    _handler(event, context)
+
     # Respond with 200 OK to acknowledge receipt of the message
     # It is necessary to return a response to the Telegram webhook and avoid retries
     # https://core.telegram.org/bots/api#making-requests
-    # TODO: #2 refator to use the common response method from the BaseLambdaHandler
-    return {
-        'statusCode': 200,
-        'headers': {
-            'Content-Type': 'application/json'
-        },
-        'body': json.dumps({"status": "ok"})  # Respond to channel webhook with 200 OK
-    }
+    return _handler(event, context)
