@@ -13,7 +13,7 @@ from aws_cdk import (
     aws_lambda as _lambda,
     aws_apigateway as apigateway,
     aws_sns as sns,
-    CfnOutput,  
+    CfnOutput,
 )
 from aws_cdk import aws_sns_subscriptions as sns_subscriptions
 from constructs import Construct
@@ -89,7 +89,7 @@ class ChannelRouterStack(Stack):
             self,
             "OutgoingMessagesTopic",
             display_name="Outgoing Messages Topic",
-            topic_name="outgoing-messages-topic",
+            topic_name="OutgoingMessagesTopic",
         )
 
         # Create a Lambda function to send outgoing messages to the appropriate channel
@@ -108,4 +108,12 @@ class ChannelRouterStack(Stack):
         # Configure the outgoing messages sender Lambda as a listener of the outgoing messages SNS topic
         outgoing_messages_sns_topic.add_subscription(
             sns_subscriptions.LambdaSubscription(outgoing_messages_sender_lambda)
+        )
+
+        # Export the SNS Topic ARN using CfnOutput for cross-stack reference
+        CfnOutput(
+            self,
+            "OutgoingMessagesTopicArn",
+            value=outgoing_messages_sns_topic.topic_arn,
+            export_name="OutgoingMessagesTopicArn",  # Export name to be referenced by other stacks
         )
