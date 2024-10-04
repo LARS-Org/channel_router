@@ -21,8 +21,6 @@ class ChannelHandler:
         """
         This method must send the message to the chatbot.
         """
-        print("full_reply_plain_text_msg: ", full_reply_plain_text_msg)
-        
         if not full_reply_plain_text_msg:
             # nothing to do
             return
@@ -135,6 +133,33 @@ class ChannelHandler:
 
         return result
 
+    def _extract_bot_token(self) -> str:
+        """
+        Extracts the Channel Bot Token from the self.body["channels_tokens"].
+        The expected structure is:
+        {
+            "channel_name": "channel_token",
+            ...
+        }
+        """
+        if "channels_tokens" in self._lambda_handler.body:
+            token = self._lambda_handler.body["channels_tokens"].get(
+                self._get_channel_name()
+            )
+            return token
+        # else
+        # Token not found
+        return None
+
+    @abstractmethod
+    def _get_channel_name(self) -> str:
+        """
+        This method must return the channel name.
+        This name will work as a key to be used to identify the channel
+        in several parts of the code.
+        """
+        # must be implemented by the subclass
+
     @abstractmethod
     def _get_max_message_length(self) -> int:
         """
@@ -206,7 +231,7 @@ class ChannelHandler:
         otherwise, returns False (it means the user is a bot).
         """
         # must be implemented by the subclass
-        
+
     @abstractmethod
     def extract_message_timestamp(self) -> int:
         """

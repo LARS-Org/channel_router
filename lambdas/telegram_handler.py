@@ -3,7 +3,6 @@ This module contains the Lambda handler class to process incoming Telegram messa
 """
 
 from channel_handler import ChannelHandler
-import os
 import requests
 from app_common.base_lambda_handler import BaseLambdaHandler
 
@@ -16,8 +15,11 @@ class TelegramHandler(ChannelHandler):
     def __init__(self, lambda_handler: BaseLambdaHandler) -> None:
         super().__init__(lambda_handler)
         # Telegram Bot Token from environment variable
-        self._bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+        self._bot_token = self._extract_bot_token()
         self._telegram_server_url = f"https://api.telegram.org/bot{self._bot_token}/"
+
+    def _get_channel_name(self) -> str:
+        return "telegram"
 
     def _do_reply_with_plain_text(self, full_msg):
         """
@@ -33,7 +35,7 @@ class TelegramHandler(ChannelHandler):
         response = requests.post(
             self._telegram_server_url + "sendMessage", data=data, timeout=10
         )
-        
+
         response.raise_for_status()
 
         response_json = response.json()

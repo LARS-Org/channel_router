@@ -33,7 +33,7 @@ class MessageSender(BaseLambdaHandler):
         channel_server_response = channel_handler.send_plain_text_reply(
             self.body["bot_message"]
         )
-        self.do_log(channel_server_response)
+        #TODO: #12 Deal with erros when sending the message
 
 
 def handler(event, context):
