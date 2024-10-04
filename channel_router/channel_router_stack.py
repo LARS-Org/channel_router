@@ -22,8 +22,9 @@ from constructs import Construct
 class ChannelRouterStack(Stack):
     """
     AWS CDK stack to deploy the ChannelRouter infrastructure for multi-channel chatbot interactions.
-    Uses FIFO SQS queues to ensure message ordering between the receiver and handler Lambdas.
     """
+
+    # TODO: #11 Use FIFO SQS queues to ensure message ordering between the receiver and handler Lambdas.
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
