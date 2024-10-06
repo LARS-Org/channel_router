@@ -75,9 +75,9 @@ def handler(event, context):
     # Respond with 200 OK to acknowledge receipt of the message
     # It is necessary to return a response to the Telegram webhook and avoid retries
     # https://core.telegram.org/bots/api#making-requests
-
-    return BaseLambdaHandler.response(
-        status_code=200,
-        headers={"Content-Type": "application/json"},
-        body=json.dumps({"status": "ok"})  # Respond to channel webhook with 200 OK
-    )
+    # TODO: #2 refator to use the common response method from the BaseLambdaHandler
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "application/json"},
+        "body": json.dumps({"status": "ok"}),  # Respond to channel webhook with 200 OK
+    }
