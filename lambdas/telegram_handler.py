@@ -18,7 +18,7 @@ class TelegramHandler(ChannelHandler):
         self._bot_token = self._extract_bot_token()
         self._telegram_server_url = f"https://api.telegram.org/bot{self._bot_token}/"
 
-    def _get_channel_name(self) -> str:
+    def get_channel_name(self) -> str:
         return "telegram"
 
     def _do_reply_with_plain_text(self, full_msg):
