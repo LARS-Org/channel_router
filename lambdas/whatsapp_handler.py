@@ -157,15 +157,11 @@ class WhatsAppHandler(ChannelHandler):
     def extract_channel_webhook_validation_code(self):
         """
         This method handles the WhatsApp webhook validation process by
-        simply returning the challenge code
-        provided in the query parameters without validating the token.
+        simply returning the challenge code provided in the query parameters 
+        without validating the token.
         """
-        print(self._lambda_handler.event)
-        print(self._lambda_handler.context)
         query_params = self._lambda_handler.event.get("queryStringParameters", {})
-        print(query_params, type(query_params))
         challenge = query_params.get("hub.challenge")
-        print(f"WhatsApp challenge: {challenge}")
 
         # Return the challenge to validate the webhook
         return challenge
