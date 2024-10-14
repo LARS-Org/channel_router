@@ -22,7 +22,7 @@ class AllChannelsReceiver(BaseLambdaHandler):
 
     def _handle(self):
         """
-        The main method to process incoming messages.
+        Handle the incoming messages from all channels.
         """
         # The resource corresponds to the channel name that sent the message
         channel_name = self.event["resource"].split("/")[-1]
@@ -36,6 +36,36 @@ class AllChannelsReceiver(BaseLambdaHandler):
 
         # Create the handler instance
         handler_instance: ChannelHandler = handler_class(self)
+
+        # test if is a GET request
+        if self.event["httpMethod"] == "GET":
+            return self._handle_get(handler_instance)
+        # test if is a POST request
+        if self.event["httpMethod"] == "POST":
+            return self._handle_post(handler_instance)
+        # if it is not a GET or POST request, return an error
+        self.do_log("Invalid request method.")
+        return {
+            "statusCode": 405,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"error": "Method Not Allowed"}),
+        }
+
+    def _handle_get(self, handler_instance: ChannelHandler):
+        """
+        Handle the GET request.
+        """
+        return {
+            # Respond to channel webhook with 200 OK
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": handler_instance.extract_channel_webhook_validation_code(),
+        }
+
+    def _handle_post(self, handler_instance: ChannelHandler):
+        """
+        The main method to process incoming messages.
+        """
         # Get the message details from the handler
         app_token = handler_instance.extract_app_token()
         user_message = handler_instance.extract_user_txt_msg()
@@ -50,7 +80,7 @@ class AllChannelsReceiver(BaseLambdaHandler):
         sns_message = json.dumps(
             {
                 "app_token": app_token,
-                "channel": channel_name,
+                "channel": handler_instance.get_channel_name(),
                 "user_message": user_message,
                 "channel_user_firstname": channel_user_firstname,
                 "channel_user_id": channel_user_id,
@@ -61,6 +91,17 @@ class AllChannelsReceiver(BaseLambdaHandler):
         )
         # Forward the message to the SNS topic
         self.publish_to_sns(topic_arn=sns_topic_arn, message=sns_message)
+        # Respond with 200 OK to acknowledge receipt of the message
+        # It is necessary to return a response to the Channel webhook and avoid retries
+        # v.g: https://core.telegram.org/bots/api#making-requests
+        # TODO: #2 refator to use the common response method from the BaseLambdaHandler
+        return {
+            "statusCode": 200,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps(
+                {"status": "ok"}
+            ),  # Respond to channel webhook with 200 OK
+        }
 
 
 def handler(event, context):
@@ -71,13 +112,4 @@ def handler(event, context):
     # Implicitly invokes __call__() ...
     #   ... which invokes _do_the_job() ...
     #     ... which invokes before_handle(), handle() and after_handle()
-    _handler(event, context)
-    # Respond with 200 OK to acknowledge receipt of the message
-    # It is necessary to return a response to the Telegram webhook and avoid retries
-    # https://core.telegram.org/bots/api#making-requests
-    # TODO: #2 refator to use the common response method from the BaseLambdaHandler
-    return {
-        "statusCode": 200,
-        "headers": {"Content-Type": "application/json"},
-        "body": json.dumps({"status": "ok"}),  # Respond to channel webhook with 200 OK
-    }
+    return _handler(event, context)

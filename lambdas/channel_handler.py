@@ -144,7 +144,7 @@ class ChannelHandler:
         """
         if "channels_tokens" in self._lambda_handler.body:
             token = self._lambda_handler.body["channels_tokens"].get(
-                self._get_channel_name()
+                self.get_channel_name()
             )
             return token
         # else
@@ -152,7 +152,7 @@ class ChannelHandler:
         return None
 
     @abstractmethod
-    def _get_channel_name(self) -> str:
+    def get_channel_name(self) -> str:
         """
         This method must return the channel name.
         This name will work as a key to be used to identify the channel
@@ -238,3 +238,9 @@ class ChannelHandler:
         This method must return the timestamp of the message.
         """
         # must be implemented by the subclass
+
+    def extract_channel_webhook_validation_code(self):
+        """
+        If necessary, this method must return the webhook validation code.
+        """
+        return None
