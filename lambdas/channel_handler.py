@@ -133,7 +133,7 @@ class ChannelHandler:
 
         return result
 
-    def _extract_bot_token(self) -> str:
+    def _extract_bot_token(self):
         """
         Extracts the Channel Bot Token from the self.body["channels_tokens"].
         The expected structure is:
@@ -141,6 +141,8 @@ class ChannelHandler:
             "channel_name": "channel_token",
             ...
         }
+        Observe that "channel_token" can have a specific structure for each channel.
+        So, for Telegram, it is a string, but for WhatsApp, it is a dictionary.
         """
         if "channels_tokens" in self._lambda_handler.body:
             token = self._lambda_handler.body["channels_tokens"].get(
@@ -171,13 +173,6 @@ class ChannelHandler:
     def _do_reply_with_plain_text(self, full_msg):
         """
         This method must send the message to the chatbot.
-        """
-        # must be implemented by the subclass
-
-    @abstractmethod
-    def extract_app_token(self):
-        """
-        This method must return the app id.
         """
         # must be implemented by the subclass
 

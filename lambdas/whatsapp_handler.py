@@ -5,7 +5,6 @@ This module contains the Lambda handler class to process incoming WhatsApp messa
 from channel_handler import ChannelHandler
 import requests
 from app_common.base_lambda_handler import BaseLambdaHandler
-import os
 
 
 class WhatsAppHandler(ChannelHandler):
@@ -15,12 +14,24 @@ class WhatsAppHandler(ChannelHandler):
 
     def __init__(self, lambda_handler: BaseLambdaHandler) -> None:
         super().__init__(lambda_handler)
-        # WhatsApp Access Token and Phone Number ID from environment variables
-        self._access_token = os.environ.get("WHATSAPP_ACCESS_TOKEN")
-        self._phone_number_id = os.environ.get("WHATSAPP_PHONE_NUMBER_ID")
-        self._whatsapp_api_url = (
-            f"https://graph.facebook.com/v17.0/{self._phone_number_id}/messages"
-        )
+        self._access_token = None
+        self._phone_number_id = None
+        self._whatsapp_api_url = None
+        token_info = self._extract_bot_token()
+        if token_info:
+            # the expected structure for WhatsApp token_info is:
+            # {
+            #     "access_token": "access token",
+            #     "phone_number_id": "phone number id"
+            # }
+            # observe that "access token" and "phone number id" will be available
+            # only after the message be processed by other components.
+            # So, it's necessary keep the access using ".get" method.
+            self._access_token = token_info.get("access_token")
+            self._phone_number_id = token_info.get("phone_number_id")
+            self._whatsapp_api_url = (
+                f"https://graph.facebook.com/v21.0/{self._phone_number_id}/messages"
+            )
 
     def get_channel_name(self) -> str:
         return "whatsapp"
@@ -53,12 +64,6 @@ class WhatsAppHandler(ChannelHandler):
         Returns the maximum message length supported by WhatsApp.
         """
         return 4096
-
-    def extract_app_token(self):
-        """
-        There is no app token to extract from the incoming WhatsApp message.
-        """
-        return None
 
     def extract_user_txt_msg(self) -> str:
         """
@@ -97,15 +102,15 @@ class WhatsAppHandler(ChannelHandler):
         WhatsApp conversation currently being serviced by this lambda function.
         """
         body = self._lambda_handler.body
-        if "entry" in body:
-            try:
-                user_id = body["entry"][0]["changes"][0]["value"]["contacts"][0][
-                    "wa_id"
-                ]
-                return user_id
-            except (IndexError, KeyError):
-                return None
-        return None
+
+        if "channel_user_id" in body:
+            # This is the structure of the body when the
+            # chatbot message arrives after the processing
+            return body["channel_user_id"]
+        # else:
+        # This is the structure of the body when the message arrives to be processed
+        user_id = body["entry"][0]["changes"][0]["value"]["contacts"][0]["wa_id"]
+        return user_id
 
     def extract_channel_chat_id(self):
         """
@@ -157,7 +162,7 @@ class WhatsAppHandler(ChannelHandler):
     def extract_channel_webhook_validation_code(self):
         """
         This method handles the WhatsApp webhook validation process by
-        simply returning the challenge code provided in the query parameters 
+        simply returning the challenge code provided in the query parameters
         without validating the token.
         """
         query_params = self._lambda_handler.event.get("queryStringParameters", {})

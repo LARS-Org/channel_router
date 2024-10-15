@@ -24,9 +24,14 @@ class AllChannelsReceiver(BaseLambdaHandler):
         """
         Handle the incoming messages from all channels.
         """
-        # The resource corresponds to the channel name that sent the message
-        channel_name = self.event["resource"].split("/")[-1]
-        self.do_log(f"Received message from channel: {channel_name}")
+        # Extract app token and channel from the URL path
+        path_parameters = self.event["pathParameters"]["proxy"].split("/")
+        channel_name = path_parameters[0]  # e.g., "whatsapp"
+        app_token = path_parameters[1]  # e.g., "bot123"
+
+        self.do_log(
+            f"Received message from channel: {channel_name} with app token: {app_token}"
+        )
 
         # Get the handler class for the channel
         handler_class = HANDLERS_MAP.get(channel_name)
@@ -42,7 +47,7 @@ class AllChannelsReceiver(BaseLambdaHandler):
             return self._handle_get(handler_instance)
         # test if is a POST request
         if self.event["httpMethod"] == "POST":
-            return self._handle_post(handler_instance)
+            return self._handle_post(handler_instance, app_token)
         # if it is not a GET or POST request, return an error
         self.do_log("Invalid request method.")
         return {
@@ -62,12 +67,11 @@ class AllChannelsReceiver(BaseLambdaHandler):
             "body": handler_instance.extract_channel_webhook_validation_code(),
         }
 
-    def _handle_post(self, handler_instance: ChannelHandler):
+    def _handle_post(self, handler_instance: ChannelHandler, app_token: str):
         """
         The main method to process incoming messages.
         """
         # Get the message details from the handler
-        app_token = handler_instance.extract_app_token()
         user_message = handler_instance.extract_user_txt_msg()
         channel_user_firstname = handler_instance.extract_channel_user_firstname()
         channel_user_id = handler_instance.extract_channel_user_id()

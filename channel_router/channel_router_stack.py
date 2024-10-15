@@ -29,10 +29,6 @@ class ChannelRouterStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        # List of supported channels
-        # TODO: #1 get this list from a configuration file or environment variables
-        channels_list = {"telegram", "whatsapp", "messenger"}
-
         # Create API Gateway to handle incoming webhooks from various channels
         api_gateway = apigateway.RestApi(
             self,
@@ -51,66 +47,36 @@ class ChannelRouterStack(Stack):
             timeout=Duration.seconds(60),
         )
 
-        for channel in channels_list:
-            # Add a resource for each channel (e.g., /telegram, /whatsapp, /messenger)
-            channel_resource = api_gateway.root.add_resource(channel)
+        # Add a proxy resource to handle dynamic channel and bot routing
+        proxy_resource = api_gateway.root.add_resource("{proxy+}")
 
-            # Add POST method for processing incoming messages
-            channel_resource.add_method(
-                "POST",
-                apigateway.LambdaIntegration(all_channels_receiver_lambda),
-                method_responses=[
-                    {
-                        "statusCode": "200",
-                        "responseParameters": {
-                            "method.response.header.Access-Control-Allow-Origin": True
-                        },
-                    }
-                ],
-            )
+        # Add POST method for handling webhook messages
+        proxy_resource.add_method(
+            "POST",
+            apigateway.LambdaIntegration(all_channels_receiver_lambda),
+            method_responses=[
+                {
+                    "statusCode": "200",
+                    "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": True
+                    },
+                }
+            ],
+        )
 
-            # Add GET method for webhook validation (usually used by WhatsApp/Facebook)
-            channel_resource.add_method(
-                "GET",
-                apigateway.LambdaIntegration(all_channels_receiver_lambda),
-                method_responses=[
-                    {
-                        "statusCode": "200",
-                        "responseParameters": {
-                            "method.response.header.Access-Control-Allow-Origin": True
-                        },
-                    }
-                ],
-            )
-
-            # Add CORS preflight OPTIONS method
-            channel_resource.add_method(
-                "OPTIONS",
-                apigateway.MockIntegration(
-                    integration_responses=[
-                        {
-                            "statusCode": "200",
-                            "responseParameters": {
-                                "method.response.header.Access-Control-Allow-Headers": "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'",
-                                "method.response.header.Access-Control-Allow-Origin": "'*'",
-                                "method.response.header.Access-Control-Allow-Methods": "'GET,POST,OPTIONS'",
-                            },
-                        }
-                    ],
-                    passthrough_behavior=apigateway.PassthroughBehavior.NEVER,
-                    request_templates={"application/json": '{"statusCode": 200}'},
-                ),
-                method_responses=[
-                    {
-                        "statusCode": "200",
-                        "responseParameters": {
-                            "method.response.header.Access-Control-Allow-Headers": True,
-                            "method.response.header.Access-Control-Allow-Origin": True,
-                            "method.response.header.Access-Control-Allow-Methods": True,
-                        },
-                    }
-                ],
-            )
+        # Add GET method for webhook validation (for WhatsApp/Facebook)
+        proxy_resource.add_method(
+            "GET",
+            apigateway.LambdaIntegration(all_channels_receiver_lambda),
+            method_responses=[
+                {
+                    "statusCode": "200",
+                    "responseParameters": {
+                        "method.response.header.Access-Control-Allow-Origin": True
+                    },
+                }
+            ],
+        )
 
         # AllChannelsReceiverLambda, after consuming and processing the incoming messages,
         # must forward the messages using an SNS topic.

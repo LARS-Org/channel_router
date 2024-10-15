@@ -48,13 +48,6 @@ class TelegramHandler(ChannelHandler):
         """
         return 4096
 
-    def extract_app_token(self):
-        """
-        Extracts the app ID from the Telegram message currently being serviced.
-        For that use the 'X-Telegram-Bot-Api-Secret-Token' header from the incoming message.
-        """
-        return self._lambda_handler.event["headers"]["X-Telegram-Bot-Api-Secret-Token"]
-
     def extract_user_txt_msg(self) -> str:
         """
         Returns the text of a message (most likely the latest message) in the
