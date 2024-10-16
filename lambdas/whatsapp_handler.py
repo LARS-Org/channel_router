@@ -1,5 +1,7 @@
 """
 This module contains the Lambda handler class to process incoming WhatsApp messages.
+See:
+https://developers.facebook.com/docs/whatsapp/api/messages/text/
 """
 
 from channel_handler import ChannelHandler
